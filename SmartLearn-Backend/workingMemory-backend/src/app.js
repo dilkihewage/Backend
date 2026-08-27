@@ -53,6 +53,8 @@ export const createApp = ({ clientUrls = [] }) => {
   // Routes
   app.use('/api/health', healthRoutes);
   app.use('/api/working-memory', workingMemoryRoutes);
+  // Backward-compatible alias used by the existing frontend client.
+  app.use('/api/workingMemory', workingMemoryRoutes);
 
   // Error Handling
   app.use(notFoundHandler);
