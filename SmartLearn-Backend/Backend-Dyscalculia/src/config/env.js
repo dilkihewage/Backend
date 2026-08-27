@@ -14,7 +14,7 @@ const parseOrigins = (value) => {
 };
 
 export const env = {
-  port: Number(process.env.PORT || 5001),
+  port: Number(process.env.PORT || 4001),
   nodeEnv: process.env.NODE_ENV || 'development',
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDbName: process.env.MONGODB_DB_NAME || '',

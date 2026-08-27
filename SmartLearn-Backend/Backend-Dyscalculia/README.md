@@ -81,7 +81,7 @@ cp .env.example .env
 npm start
 ```
 
-It listens on `http://localhost:5001` by default and requires `MONGODB_URI`. Its endpoint base is `/api/dyscalculia`, including:
+It listens on `http://localhost:4001` by default and requires `MONGODB_URI`. Its endpoint base is `/api/dyscalculia`, including:
 
 - `GET /api/dyscalculia/overview`
 - `POST /api/dyscalculia/sessions`
