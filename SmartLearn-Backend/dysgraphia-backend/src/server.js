@@ -15,7 +15,8 @@ console.log("Starting Sinhala handwriting model...");
 
 const pythonCommand =
   process.platform === "win32"
-    ? path.join(__dirname, "models", "venv", "Scripts", "python.exe")
+    ? process.env.PYTHON_EXECUTABLE ||
+      path.resolve(__dirname, "..", "..", "..", "venv", "Scripts", "python.exe")
     : "python3";
 
 const pythonProcess = spawn(
