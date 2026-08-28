@@ -301,6 +301,35 @@ describe("dysgraphia service", () => {
     expect(repository.debugGetAttempts("user-1").filter((attempt) => attempt.type === "intervention")).toHaveLength(1);
   });
 
+  it("stores mirror-drag stars once per word and only adds a better replay score", async () => {
+    const attempt = (completionId, targetWord, starsEarned) => service.submitInterventionAttempt("user-1", {
+      completionId,
+      gameType: "mirror-letter-drag",
+      targetLetterId: "ta",
+      targetWord,
+      correct: true,
+      score: 100,
+      accuracy: 1,
+      attempts: 3,
+      mistakes: 0,
+      completed: true,
+      starsEarned,
+      durationSeconds: 12,
+    });
+
+    const first = await attempt("mirror-round-first", "word-one", 2);
+    const repeated = await attempt("mirror-round-repeat", "word-one", 2);
+    const improved = await attempt("mirror-round-improved", "word-one", 3);
+    const otherWord = await attempt("mirror-round-other", "word-two", 2);
+
+    expect(first.starsAdded).toBe(2);
+    expect(repeated.starsAdded).toBe(0);
+    expect(improved.starsAdded).toBe(1);
+    expect(otherWord.starsAdded).toBe(2);
+    expect(otherWord.overviewSummary.stats.totalStars).toBe(5);
+    expect((await service.getOverview("user-1")).stats.totalStars).toBe(5);
+  });
+
   it("uses one saved total for all letter tasks and reports only newly added stars", async () => {
     const freeTrace = await service.submitLetterPracticeAttempt("user-1", {
       letterId: "ta",

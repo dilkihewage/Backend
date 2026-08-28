@@ -46,7 +46,7 @@ function createEmptySummary(now = new Date().toISOString()) {
       writingLines: {},
       interventions: {
         processedCompletionIds: [],
-        mirrorReversal: { totalAttempts: 0, correctAttempts: 0, recentResults: [] },
+        mirrorReversal: { totalAttempts: 0, correctAttempts: 0, recentResults: [], rewardStarsByWord: {} },
         wordWriting: { totalAttempts: 0, correctAttempts: 0, recentResults: [] },
         letterWriting: { totalAttempts: 0, correctAttempts: 0, recentResults: [], byLetter: {} },
       },
@@ -135,6 +135,9 @@ function ensureSummary(summary) {
       ...(merged.dysgraphia.interventions[area] || {}),
     };
   });
+  merged.dysgraphia.interventions.mirrorReversal.rewardStarsByWord = {
+    ...(merged.dysgraphia.interventions.mirrorReversal.rewardStarsByWord || {}),
+  };
   merged.dysgraphia.interventions.letterWriting.byLetter = {
     ...(merged.dysgraphia.interventions.letterWriting.byLetter || {}),
   };
@@ -183,6 +186,10 @@ function recalculateSummary(summary) {
     Object.values(summary.words).reduce((total, group) => total + group.stars, 0) +
     Object.values(summary.dysgraphia?.mirrorLetters || {}).reduce(
       (total, letter) => total + Number(letter.starsEarned || 0),
+      0
+    ) +
+    Object.values(summary.dysgraphia?.interventions?.mirrorReversal?.rewardStarsByWord || {}).reduce(
+      (total, stars) => total + Number(stars || 0),
       0
     );
 
@@ -734,6 +741,16 @@ function applyInterventionProgress(summary, payload) {
       : "letterWriting";
 
   interventions[area] = updateInterventionAggregate(interventions[area], payload);
+  if (area === "mirrorReversal" && payload.targetWord && payload.completed) {
+    const rewardStarsByWord = interventions.mirrorReversal.rewardStarsByWord || {};
+    interventions.mirrorReversal.rewardStarsByWord = {
+      ...rewardStarsByWord,
+      [payload.targetWord]: Math.max(
+        Number(rewardStarsByWord[payload.targetWord] || 0),
+        Number(payload.starsEarned || 0)
+      ),
+    };
+  }
   if (area === "letterWriting" && payload.targetLetterId) {
     interventions.letterWriting.byLetter[payload.targetLetterId] = updateInterventionAggregate(
       interventions.letterWriting.byLetter[payload.targetLetterId],

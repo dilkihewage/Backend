@@ -408,6 +408,7 @@ function createDysgraphiaService({ repository, predictor, now = () => new Date()
   async function submitInterventionAttempt(uid, payload) {
     const attemptedAt = now();
     const currentSummary = await getOrCreateSummary(uid);
+    const previousTotalStars = Number(currentSummary.stats?.totalStars || 0);
     const alreadyProcessed = currentSummary.dysgraphia?.interventions?.processedCompletionIds
       ?.includes(payload.completionId);
     if (alreadyProcessed) {
@@ -444,6 +445,8 @@ function createDysgraphiaService({ repository, predictor, now = () => new Date()
     return {
       attemptId,
       duplicate: false,
+      starsEarned: payload.starsEarned,
+      starsAdded: Math.max(0, Number(nextSummary.stats?.totalStars || 0) - previousTotalStars),
       result: {
         gameType: result.gameType,
         targetLetterId: result.targetLetterId || null,
