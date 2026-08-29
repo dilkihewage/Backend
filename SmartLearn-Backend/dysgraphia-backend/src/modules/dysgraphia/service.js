@@ -213,7 +213,12 @@ function createTimer(flow, uid) {
   };
 }
 
-function createDysgraphiaService({ repository, predictor, now = () => new Date().toISOString() }) {
+function createDysgraphiaService({
+  repository,
+  predictor,
+  now = () => new Date().toISOString(),
+  allowDevReset = env.allowDevReset,
+}) {
   async function predictHandwritingLetter(file) {
     const timer = createTimer("prediction-only-letter", "no-persistence");
     const prediction = await timer.measure("ML_PREDICTION", () =>
@@ -700,7 +705,7 @@ function createDysgraphiaService({ repository, predictor, now = () => new Date()
 
   async function resetProgress(requestUser) {
     const isAdmin = requestUser?.role === "admin";
-    if (!isAdmin) {
+    if (!isAdmin && !allowDevReset) {
       throw new AppError(403, "FORBIDDEN", "Only admins can reset dysgraphia progress.");
     }
 

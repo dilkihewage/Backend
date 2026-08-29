@@ -1,4 +1,6 @@
-fastapi
-uvicorn
-ultralytics
-python-multipart
+fastapi==0.141.1
+uvicorn==0.52.3
+ultralytics==8.4.121
+python-multipart==0.0.32
+torch==2.13.0
+torchvision==0.28.0

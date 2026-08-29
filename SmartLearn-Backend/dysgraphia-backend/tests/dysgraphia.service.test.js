@@ -301,6 +301,21 @@ describe("dysgraphia service", () => {
     expect(repository.debugGetAttempts("user-1").filter((attempt) => attempt.type === "intervention")).toHaveLength(1);
   });
 
+  it("allows a non-admin reset only when development reset is explicitly enabled", async () => {
+    const devResetService = createDysgraphiaService({
+      repository,
+      predictor,
+      allowDevReset: true,
+      now: () => "2026-06-03T10:00:00.000Z",
+    });
+
+    await expect(
+      devResetService.resetProgress({ uid: "user-1", role: "student" })
+    ).resolves.toMatchObject({
+      stats: { totalStars: 0 },
+    });
+  });
+
   it("stores mirror-drag stars once per word and only adds a better replay score", async () => {
     const attempt = (completionId, targetWord, starsEarned) => service.submitInterventionAttempt("user-1", {
       completionId,

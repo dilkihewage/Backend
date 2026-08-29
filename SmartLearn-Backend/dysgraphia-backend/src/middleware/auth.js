@@ -1,21 +1,9 @@
 const { AppError } = require("../utils/appError");
-const env = require("../config/env");
 
-function formatErrorDetails(error) {
-  if (!error) {
-    return null;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
+function getSafeRequestContext(req) {
   return {
-    name: error.name,
-    message: error.message,
-    code: error.code,
-    stack: error.stack,
-    details: error.errorInfo || error.errors || null,
+    method: req.method,
+    path: req.originalUrl || req.url,
   };
 }
 
@@ -46,33 +34,16 @@ function resolveRole(decodedToken, profileRole) {
 
 function createAuthMiddleware({ authClient, repository, logger }) {
   return async function authMiddleware(req, res, next) {
-    console.log(`[AUTH] middleware hit: ${req.method} ${req.originalUrl}`);
-    console.log(`[AUTH] Authorization header present: ${Boolean(req.headers.authorization)}`);
-
     const token = parseBearerToken(req.headers.authorization);
 
     if (!token) {
-      console.log("[AUTH] bearer token missing or malformed");
+      logger?.warn(getSafeRequestContext(req), "Authentication header missing or malformed");
       next(new AppError(401, "UNAUTHENTICATED", "Missing or invalid Authorization header."));
       return;
     }
 
-    console.log(`[AUTH] bearer token preview: ${token.slice(0, 30)}...`);
-    console.log("[AUTH] authClient present:", Boolean(authClient));
-    console.log("[AUTH] configured Firebase project ID:", env.firebaseProjectId || "(empty)");
-
     try {
-      console.log("[AUTH] calling verifyIdToken()");
       const decodedToken = await authClient.verifyIdToken(token);
-      console.log("[AUTH] decoded token payload:", JSON.stringify(decodedToken, null, 2));
-      console.log("[AUTH] token audience:", decodedToken?.aud || "(empty)");
-      console.log("[AUTH] token issuer:", decodedToken?.iss || "(empty)");
-      console.log("[AUTH] token firebase sign-in provider:", decodedToken?.firebase?.sign_in_provider || "(empty)");
-
-      if (decodedToken?.aud && env.firebaseProjectId && decodedToken.aud !== env.firebaseProjectId) {
-        console.warn("[AUTH] token audience does not match configured Firebase project ID");
-      }
-
       const profileRole = repository?.getUserRole ? await repository.getUserRole(decodedToken.uid) : null;
 
       req.user = {
@@ -82,13 +53,18 @@ function createAuthMiddleware({ authClient, repository, logger }) {
         claims: decodedToken,
       };
 
+      logger?.debug(getSafeRequestContext(req), "Firebase token verified");
       next();
     } catch (error) {
-      console.error("[AUTH] verifyIdToken failed");
-      console.error("[AUTH] full verifyIdToken error:", JSON.stringify(formatErrorDetails(error), null, 2));
-      console.error("[AUTH] raw firebase error object:", error);
+      logger?.warn(
+        {
+          ...getSafeRequestContext(req),
+          errorCode: typeof error?.code === "string" ? error.code : "TOKEN_VERIFICATION_FAILED",
+        },
+        "Firebase token verification failed"
+      );
 
-      next(new AppError(401, "UNAUTHENTICATED", error?.message || "Firebase authentication failed.", { cause: error }));
+      next(new AppError(401, "UNAUTHENTICATED", "Authentication failed."));
     }
   };
 }
