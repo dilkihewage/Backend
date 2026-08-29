@@ -96,6 +96,9 @@ Predictor-related:
 - `PREDICTOR_HEALTH_TIMEOUT_MS` controls the readiness-check timeout
 - `MODEL_STARTUP_TIMEOUT_MS` controls how long Node waits for the model to load
 - `MODEL_STARTUP_POLL_INTERVAL_MS` controls how frequently readiness is checked
+- `MODEL_IMAGE_SIZE` controls YOLO input resolution (`416` is the speed-focused default)
+- `MODEL_DEVICE` selects inference hardware (`cpu`, `cuda`, and so on)
+- `MODEL_MAX_DETECTIONS` limits post-processing work for each handwriting image
 - `ML_CONFIDENCE_THRESHOLD`
 - `MAX_IMAGE_SIZE_MB`
 - `ALLOW_MOCK_TARGET_ECHO`

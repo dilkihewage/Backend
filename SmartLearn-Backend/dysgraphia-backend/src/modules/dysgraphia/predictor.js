@@ -1,8 +1,16 @@
 const axios = require("axios");
 const FormData = require("form-data");
+const http = require("http");
 const env = require("../../config/env");
 const labelMap = require("../../utils/labelMap");
 const { AppError } = require("../../utils/appError");
+
+const predictorClient = axios.create({
+  httpAgent: new http.Agent({ keepAlive: true, maxSockets: 4 }),
+  timeout: 30000,
+  maxContentLength: Infinity,
+  maxBodyLength: Infinity,
+});
 
 
 function mapNumericLabelIfNeeded(label) {
@@ -59,25 +67,13 @@ async function pythonPredictSingleCharacter(imageBuffer) {
   });
 
   try {
-    const predictionLabel = `[dysgraphia:python:${Date.now()}:${Math.random().toString(36).slice(2, 7)}] NODE_TO_PYTHON_PREDICTION`;
-    console.time(predictionLabel);
-    let data;
-    try {
-      ({ data } = await axios.post(
+    const { data } = await predictorClient.post(
         predictorUrl,
         form,
         {
           headers: form.getHeaders(),
-          timeout: 30000,
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity,
         }
-      ));
-    } finally {
-      console.timeEnd(predictionLabel);
-    }
-
-    console.log("RAW PYTHON:", data);
+      );
 
     if (!data?.success || !data?.label) {
       return {
@@ -105,11 +101,6 @@ async function pythonPredictSingleCharacter(imageBuffer) {
         }))
       : [];
 
-    console.log("YOLO LABEL:", data.label);
-    console.log("SINHALA:", predicted);
-    console.log("CONFIDENCE:", confidence);
-    console.log("PREDICTIONS:", predictions);
-
     return {
       predicted,
       confidence,
@@ -119,11 +110,6 @@ async function pythonPredictSingleCharacter(imageBuffer) {
     };
 
   } catch (error) {
-
-    console.error(
-      "Python model error:",
-      error.response?.data || error.message
-    );
 
     throw new AppError(
       422,
