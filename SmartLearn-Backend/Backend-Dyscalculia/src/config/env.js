@@ -19,6 +19,7 @@ export const env = {
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDbName: process.env.MONGODB_DB_NAME || '',
   clientOrigins: parseOrigins(process.env.CLIENT_ORIGIN),
+  mlServiceUrl: process.env.ML_SERVICE_URL || `http://127.0.0.1:${process.env.ML_PORT || 4002}`,
 };
 
 export const isProduction = env.nodeEnv === 'production';

@@ -26,6 +26,28 @@ The training script now saves `digit_tracing_model.h5` directly to `models/`.
 - Python 3.10 or 3.11 is recommended (use a TensorFlow version compatible with your deployment platform).
 - The dependencies in `requirements.txt`.
 
+## Run both services locally
+
+Create the Python environment once:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Then start the Node API and Flask model service together:
+
+```bash
+npm start
+```
+
+The Node API is the single public entry point at `http://localhost:4001`.
+It proxies `/predict`, `/api/predict-number`, and
+`/api/dyscalculia/tracing/predict` to the internally running ML service on
+port `4002`. The frontend therefore only needs port `4001`. Press `Ctrl+C`
+to stop both processes.
+
 ## Run the Flask digit-recognition API locally
 
 ```bash

@@ -13,10 +13,13 @@ const modelAppPath = path.join(
 
 console.log("Starting Sinhala handwriting model...");
 
-const pythonCommand =
-  process.platform === "win32"
-    ? process.env.PYTHON_EXECUTABLE ||
-      path.resolve(__dirname, "..", "..", "..", "venv", "Scripts", "python.exe")
+const configuredPython = process.env.PYTHON_EXECUTABLE;
+const pythonCommand = configuredPython
+  ? path.isAbsolute(configuredPython)
+    ? configuredPython
+    : path.resolve(__dirname, "..", configuredPython)
+  : process.platform === "win32"
+    ? path.resolve(__dirname, "..", "..", "..", "venv", "Scripts", "python.exe")
     : "python3";
 
 const pythonProcess = spawn(
