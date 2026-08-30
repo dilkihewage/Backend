@@ -20,6 +20,8 @@ python training/train_model.py
 ```
 
 The training script now saves `digit_tracing_model.h5` directly to `models/`.
+It also saves presentation-ready `training_accuracy.png`, `training_loss.png`,
+and the underlying `training_history.json` to `training/reports/`.
 
 ## Requirements
 

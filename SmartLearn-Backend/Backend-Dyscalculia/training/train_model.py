@@ -8,10 +8,64 @@ import numpy as np
 from PIL import Image, ImageOps
 import tensorflow as tf
 from tensorflow.keras import layers, models
+import matplotlib
+
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TRAINING_DIR = Path(__file__).resolve().parent
+
+
+def save_training_reports(history, output_dir: Path) -> None:
+    """Save reusable training metrics and presentation-ready diagrams."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    metrics = {
+        key: [float(value) for value in values]
+        for key, values in history.history.items()
+    }
+
+    with open(output_dir / 'training_history.json', 'w', encoding='utf-8') as fh:
+        json.dump(metrics, fh, indent=2)
+
+    epochs = range(1, len(metrics['accuracy']) + 1)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, metrics['accuracy'], marker='o', linewidth=2,
+             label='Training Accuracy')
+    if 'val_accuracy' in metrics:
+        plt.plot(epochs, metrics['val_accuracy'], marker='o', linewidth=2,
+                 label='Validation Accuracy')
+    plt.title('Dyscalculia Digit Recognition Model Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.ylim(0, 1.02)
+    plt.xticks(list(epochs))
+    plt.grid(True, linestyle='--', alpha=0.35)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_dir / 'training_accuracy.png', dpi=300)
+    plt.close()
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(epochs, metrics['loss'], marker='o', linewidth=2,
+             label='Training Loss')
+    if 'val_loss' in metrics:
+        plt.plot(epochs, metrics['val_loss'], marker='o', linewidth=2,
+                 label='Validation Loss')
+    plt.title('Dyscalculia Digit Recognition Model Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.xticks(list(epochs))
+    plt.grid(True, linestyle='--', alpha=0.35)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(output_dir / 'training_loss.png', dpi=300)
+    plt.close()
+
+    print(f'\n✅  Training reports saved to {output_dir}')
 
 
 def decode_base64_image(data: str) -> bytes:
@@ -171,6 +225,9 @@ def main():
     parser.add_argument('--dataset-dir', type=Path,
                         default=TRAINING_DIR / 'dataset_processed',
                         help='Path to the processed custom dataset')
+    parser.add_argument('--report-dir', type=Path,
+                        default=TRAINING_DIR / 'reports',
+                        help='Directory for accuracy/loss diagrams and metric history')
     args = parser.parse_args()
 
     # ── Load MNIST base ───────────────────────────────────────────────────────
@@ -219,7 +276,7 @@ def main():
 
     validation_data = (x_test, y_test) if len(x_test) > 0 else None
 
-    model.fit(
+    history = model.fit(
         x_train,
         y_train,
         validation_data=validation_data,
@@ -227,6 +284,8 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
     )
+
+    save_training_reports(history, args.report_dir)
 
     args.model_dir.mkdir(parents=True, exist_ok=True)
     model_path = args.model_dir / 'digit_tracing_model.h5'

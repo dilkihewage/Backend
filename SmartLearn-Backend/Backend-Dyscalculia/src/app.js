@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import mongoose from 'mongoose';
 
 import { env, isProduction } from './config/env.js';
 import { dyscalculiaRouter } from './routes/dyscalculiaRoutes.js';
@@ -32,6 +33,18 @@ const proxyToModel = async (req, res, next) => {
   }
 };
 
+const requireDatabase = (req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    next();
+    return;
+  }
+
+  res.status(503).json({
+    success: false,
+    message: 'Database is unavailable. Check MONGODB_URI or Atlas network/DNS settings.',
+  });
+};
+
 export const createApp = () => {
   const app = express();
 
@@ -50,7 +63,11 @@ export const createApp = () => {
   app.post('/api/dyscalculia/tracing/predict', proxyToModel);
 
   app.get('/health', (req, res) => {
-    res.json({ success: true, message: 'Dyscalculia backend is healthy' });
+    res.json({
+      success: true,
+      message: 'Dyscalculia backend is healthy',
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'unavailable',
+    });
   });
 
   app.use('/api/dyscalculia', rateLimit({
@@ -60,7 +77,7 @@ export const createApp = () => {
     legacyHeaders: false,
   }));
 
-  app.use('/api/dyscalculia', dyscalculiaRouter);
+  app.use('/api/dyscalculia', requireDatabase, dyscalculiaRouter);
 
   app.get('/', (req, res) => {
     res.json({
