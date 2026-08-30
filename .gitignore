@@ -1,1 +1,26 @@
 /venv/
+
+# Dependency directories
+**/node_modules/
+
+# Python virtual environments (including the shared TensorFlow environment)
+**/.venv/
+**/.venv-*/
+**/venv/
+**/env/
+
+# Python/test caches
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+# Local secrets and runtime output
+**/.env
+**/.env.local
+**/uploads/
+**/runs/
+**/Ultralytics/
+
+# Common editor/OS files
+**/.DS_Store
+**/Thumbs.db
