@@ -63,13 +63,7 @@ function getFirebaseAdminApp() {
 
   const credential = cert(serviceAccount);
 
-  console.log("[FIREBASE] initializing Firebase Admin SDK");
-  console.log("[FIREBASE] service account credentials loaded successfully");
-  console.log("[FIREBASE] configured project ID:", env.firebaseProjectId || "(empty)");
-  console.log("[FIREBASE] service account project ID:", serviceAccount?.project_id || "(empty)");
-  console.log("[FIREBASE] resolved project ID:", resolvedProjectId);
-  console.log("[FIREBASE] credential source:", "service-account");
-  console.log("[FIREBASE] service account file path:", env.firebaseServiceAccountPath || "(not set)");
+  console.log("[FIREBASE] initializing Firebase Admin SDK with configured credentials");
 
   return initializeApp({
     credential,

@@ -8,6 +8,7 @@ import numpy as np
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from PIL import Image, ImageOps
+from tensorflow.keras import layers, models
 from tensorflow.keras.models import load_model
 
 
@@ -39,6 +40,31 @@ CORS(
 model = None
 
 
+def build_digit_model():
+    """Recreate the prediction network used by the training script."""
+    return models.Sequential(
+        [
+            layers.Input(shape=(28, 28, 1)),
+            layers.RandomRotation(0.08),
+            layers.RandomTranslation(0.08, 0.08),
+            layers.RandomZoom((-0.08, 0.08)),
+            layers.Conv2D(32, (3, 3), activation="relu"),
+            layers.BatchNormalization(),
+            layers.MaxPooling2D((2, 2)),
+            layers.Conv2D(64, (3, 3), activation="relu"),
+            layers.BatchNormalization(),
+            layers.MaxPooling2D((2, 2)),
+            layers.Conv2D(128, (3, 3), activation="relu"),
+            layers.BatchNormalization(),
+            layers.Flatten(),
+            layers.Dropout(0.4),
+            layers.Dense(128, activation="relu"),
+            layers.BatchNormalization(),
+            layers.Dense(10, activation="softmax"),
+        ]
+    )
+
+
 def load_digit_model() -> None:
     """Load the trained digit recognition model."""
     global model
@@ -49,7 +75,19 @@ def load_digit_model() -> None:
         )
 
     # compile=False avoids unnecessary metric warnings for prediction-only use.
-    model = load_model(str(MODEL_PATH), compile=False)
+    try:
+        model = load_model(str(MODEL_PATH), compile=False)
+    except TypeError as exc:
+        # Some HDF5 models saved by newer Keras releases contain initializer
+        # metadata that older releases cannot deserialize. The layer layout is
+        # stable and maintained in training/train_model.py, so rebuild it and
+        # restore the weights without deserializing that metadata.
+        if "input_axes" not in str(exc) and "output_axes" not in str(exc):
+            raise
+
+        model = build_digit_model()
+        model.load_weights(str(MODEL_PATH))
+
     print(f"Loaded model from {MODEL_PATH}")
 
 
@@ -430,7 +468,7 @@ if __name__ == "__main__":
         port=int(
             os.environ.get(
                 "ML_PORT",
-                os.environ.get("PORT", "4001"),
+                os.environ.get("PORT", "4002"),
             )
         ),
         debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true",

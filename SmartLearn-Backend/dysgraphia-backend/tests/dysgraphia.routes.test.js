@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app";
 import { createMemoryDysgraphiaRepository } from "../src/modules/dysgraphia/repository";
 
-function buildApp({ role = "student" } = {}) {
+function buildApp({ role = "student", modelHealthChecker } = {}) {
   const repository = createMemoryDysgraphiaRepository();
   repository.seedUserProfile("user-1", { role });
 
@@ -36,12 +36,47 @@ function buildApp({ role = "student" } = {}) {
   };
 
   return {
-    app: createApp({ authClient, repository, predictor }),
+    app: createApp({ authClient, repository, predictor, modelHealthChecker }),
     repository,
   };
 }
 
 describe("dysgraphia routes", () => {
+  it("reports ready when the Python predictor is ready", async () => {
+    const modelHealthChecker = {
+      check: vi.fn(async () => ({
+        status: "ready",
+        provider: "python",
+        detail: "Python predictor is ready.",
+      })),
+    };
+    const { app } = buildApp({ modelHealthChecker });
+
+    const response = await request(app).get("/health");
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe("ok");
+    expect(response.body.checks.predictor.status).toBe("ready");
+  });
+
+  it("reports unavailable when the Python predictor is not ready", async () => {
+    const modelHealthChecker = {
+      check: vi.fn(async () => ({
+        status: "unavailable",
+        provider: "python",
+        detail: "Python predictor did not respond to its health check.",
+      })),
+    };
+    const { app } = buildApp({ modelHealthChecker });
+
+    const response = await request(app).get("/health");
+
+    expect(response.status).toBe(503);
+    expect(response.body.status).toBe("unavailable");
+    expect(response.body.checks.api.status).toBe("ready");
+    expect(response.body.checks.predictor.status).toBe("unavailable");
+  });
+
   it("returns overview for authenticated users", async () => {
     const { app } = buildApp();
     const response = await request(app)

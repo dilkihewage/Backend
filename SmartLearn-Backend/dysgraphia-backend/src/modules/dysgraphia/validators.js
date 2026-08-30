@@ -177,6 +177,7 @@ const interventionAttemptSchema = z.object({
   attempts: z.coerce.number().int().min(1).max(100).default(1),
   mistakes: z.coerce.number().int().min(0).max(100).default(0),
   completed: z.preprocess(parseBooleanField, z.boolean().default(true)),
+  starsEarned: z.coerce.number().int().min(0).max(3).default(0),
   durationSeconds: z.coerce.number().min(0).max(7200).default(0),
 }).superRefine((value, context) => {
   if (value.gameType === "node-letter-challenge" && (!value.targetLetterId || !value.targetLetter)) {

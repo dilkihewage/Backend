@@ -52,6 +52,23 @@ to stop both processes.
 
 ## Run the Flask digit-recognition API locally
 
+### Windows (this repository layout)
+
+TensorFlow contains deeply nested files. Keep its virtual environment at the
+short workspace-root path below to avoid Windows path-length installation
+errors:
+
+```powershell
+py -3.10 -m venv ..\..\.venv-dyscalculia
+..\..\.venv-dyscalculia\Scripts\python.exe -m pip install -r requirements.txt
+.\start-ml.ps1
+```
+
+Do not use `..venv\Scripts\python.exe`; that is not the same path as
+`.venv\Scripts\python.exe`.
+
+### macOS/Linux
+
 ```bash
 python -m venv venv
 source venv/bin/activate
@@ -60,13 +77,13 @@ cp .env.example .env
 python app.py
 ```
 
-The API listens on `http://localhost:4001` by default. Python 3.10 or 3.11 is recommended for TensorFlow compatibility.
+The API listens on `http://localhost:4002` by default. Python 3.10 or 3.11 is recommended for TensorFlow compatibility.
 
 `FRONTEND_URL` accepts one or more comma-separated origins. For example:
 
 ```ini
 FRONTEND_URL=http://localhost:5173,https://your-frontend.example.com
-ML_PORT=4001
+ML_PORT=4002
 ```
 
 ## API endpoints

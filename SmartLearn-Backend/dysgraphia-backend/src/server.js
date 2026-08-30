@@ -3,6 +3,8 @@ const { spawn } = require("child_process");
 
 const env = require("./config/env");
 const { createApp } = require("./app");
+const { createModelHealthChecker } = require("./services/modelHealthService");
+const { waitForModelReady } = require("./services/modelStartupService");
 
 // START PYTHON MODEL SERVER
 const modelAppPath = path.join(
@@ -10,8 +12,6 @@ const modelAppPath = path.join(
   "models",
   "app.py"
 );
-
-console.log("Starting Sinhala handwriting model...");
 
 const configuredPython = process.env.PYTHON_EXECUTABLE;
 const pythonCommand = configuredPython
@@ -22,82 +22,116 @@ const pythonCommand = configuredPython
     ? path.resolve(__dirname, "..", "..", "..", "venv", "Scripts", "python.exe")
     : "python3";
 
-const pythonProcess = spawn(
-  pythonCommand,
-  [
-    "-m",
-    "uvicorn",
-    "app:app",
-    "--host",
-    "127.0.0.1",
-    "--port",
-    "8001",
-  ],
-  {
-    cwd: path.dirname(modelAppPath),
-    stdio: ["ignore", "pipe", "pipe"],
-  }
-);
+function startPythonModel() {
+  console.log("Starting Sinhala handwriting model...");
 
-
-// PYTHON MODEL LOGS
-pythonProcess.stdout.on("data", (data) => {
-  console.log(`[PYTHON MODEL] ${data.toString().trim()}`);
-});
-
-pythonProcess.stderr.on("data", (data) => {
-  console.error(`[PYTHON MODEL] ${data.toString().trim()}`);
-});
-
-pythonProcess.on("error", (error) => {
-  console.error(
-    "Failed to start Python model:",
-    error.message
-  );
-});
-
-pythonProcess.on("close", (code) => {
-  console.log(
-    `Python model process stopped with code ${code}`
-  );
-});
-
-// START NODE BACKEND
-const app = createApp();
-
-const server = app.listen(
-  env.port,
-  env.host,
-  () => {
-    console.log(
-      `Dysgraphia backend listening on http://${env.host}:${env.port}`
-    );
-
-    console.log(
-      "Sinhala model expected at http://127.0.0.1:8001/predict"
-    );
-  }
-);
-
-
-// CLEAN SHUTDOWN
-function shutdown() {
-
-  console.log("Shutting down...");
-
-  server.close(() => {
-
-    if (pythonProcess) {
-      pythonProcess.kill();
+  const pythonProcess = spawn(
+    pythonCommand,
+    ["-m", "uvicorn", "app:app", "--host", "127.0.0.1", "--port", "8001"],
+    {
+      cwd: path.dirname(modelAppPath),
+      stdio: ["ignore", "pipe", "pipe"],
     }
+  );
 
-    process.exit(0);
+  pythonProcess.startupError = null;
+  pythonProcess.modelServerListening = false;
+  pythonProcess.stdout.on("data", (data) => {
+    console.log(`[PYTHON MODEL] ${data.toString().trim()}`);
+  });
+  pythonProcess.stderr.on("data", (data) => {
+    const output = data.toString();
+    if (output.includes("Uvicorn running on")) {
+      pythonProcess.modelServerListening = true;
+    }
+    console.error(`[PYTHON MODEL] ${output.trim()}`);
+  });
+  pythonProcess.on("error", (error) => {
+    pythonProcess.startupError = error;
+    console.error("Failed to start Python model:", error.message);
+  });
+  pythonProcess.on("close", (code) => {
+    console.log(`Python model process stopped with code ${code}`);
+  });
 
+  return pythonProcess;
+}
+
+function listen(app) {
+  return new Promise((resolve, reject) => {
+    const server = app.listen(env.port, env.host, () => resolve(server));
+    server.once("error", reject);
   });
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+async function start() {
+  let pythonProcess = null;
+  let server = null;
+  let shuttingDown = false;
 
+  try {
+    if (env.predictorProvider === "python") {
+      pythonProcess = startPythonModel();
+      pythonProcess.once("close", (code) => {
+        if (server && !shuttingDown) {
+          console.error(`Python predictor stopped unexpectedly with code ${code}.`);
+          server.close(() => process.exit(1));
+        }
+      });
+      console.log("Waiting for the Sinhala handwriting model to become ready...");
 
-module.exports = app;
+      await waitForModelReady({
+        healthChecker: createModelHealthChecker(),
+        processHandle: pythonProcess,
+        timeoutMs: env.modelStartupTimeoutMs,
+        pollIntervalMs: env.modelStartupPollIntervalMs,
+      });
+
+      console.log("Sinhala handwriting model is ready.");
+    } else {
+      console.log(`Skipping Python model startup for predictor provider: ${env.predictorProvider}`);
+    }
+
+    const app = createApp();
+    server = await listen(app);
+    console.log(`Dysgraphia backend listening on http://${env.host}:${env.port}`);
+
+    const shutdown = () => {
+      if (shuttingDown) {
+        return;
+      }
+
+      shuttingDown = true;
+      console.log("Shutting down...");
+
+      if (pythonProcess && pythonProcess.exitCode === null) {
+        pythonProcess.kill();
+      }
+
+      server.close(() => process.exit(0));
+    };
+
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
+
+    return { app, server, pythonProcess };
+  } catch (error) {
+    if (pythonProcess && pythonProcess.exitCode === null) {
+      pythonProcess.kill();
+    }
+
+    throw error;
+  }
+}
+
+if (require.main === module) {
+  start().catch((error) => {
+    console.error("Dysgraphia backend failed to start:", error.message);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  start,
+  startPythonModel,
+};

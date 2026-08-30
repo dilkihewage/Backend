@@ -47,9 +47,14 @@ module.exports = {
   corsOrigins: parseOrigins(process.env.CORS_ORIGIN),
   predictorProvider: process.env.PREDICTOR_PROVIDER || process.env.ML_PROVIDER || "mock",
   predictorUrl: process.env.PREDICTOR_URL || process.env.PYTHON_MODEL_URL || "",
+  predictorHealthUrl: process.env.PREDICTOR_HEALTH_URL || "",
+  predictorHealthTimeoutMs: parseNumber(process.env.PREDICTOR_HEALTH_TIMEOUT_MS, 2000),
+  modelStartupTimeoutMs: parseNumber(process.env.MODEL_STARTUP_TIMEOUT_MS, 120000),
+  modelStartupPollIntervalMs: parseNumber(process.env.MODEL_STARTUP_POLL_INTERVAL_MS, 500),
   confidenceThreshold: parseNumber(process.env.ML_CONFIDENCE_THRESHOLD, 0.75),
   maxImageSizeMb: parseNumber(process.env.MAX_IMAGE_SIZE_MB, 5),
-  allowDevReset: parseBoolean(process.env.ALLOW_DEV_RESET, process.env.NODE_ENV !== "production"),
+  allowDevReset:
+    process.env.NODE_ENV !== "production" && parseBoolean(process.env.ENABLE_DEV_RESET, false),
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID || "",
   firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL || "",
   firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY

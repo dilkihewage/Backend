@@ -1,7 +1,15 @@
-from ultralytics import YOLO
+import os
 import sys
 import json
-import os
+
+# Keep Ultralytics settings in a writable project-local folder. On restricted
+# Windows accounts its default AppData settings path can be read-only.
+os.environ.setdefault(
+    "YOLO_CONFIG_DIR",
+    os.path.dirname(os.path.abspath(__file__))
+)
+
+from ultralytics import YOLO
 
 MODEL_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
