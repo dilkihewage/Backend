@@ -5,3 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 coverage/
 dist/
+Ultralytics/
+ml/Ultralytics/
+__pycache__/
+*.py[cod]

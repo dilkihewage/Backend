@@ -1,1 +1,29 @@
 /venv/
+/.venv-dyscalculia/
+
+# Node dependencies
+**/node_modules/
+
+# Python virtual environments
+**/.venv/
+**/.venv-*/
+**/venv/
+**/env/
+
+# Python and test caches
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+
+# Local environment files
+**/.env
+**/.env.local
+
+# Generated runtime and ML output
+**/uploads/
+**/runs/
+**/Ultralytics/
+
+# OS-generated files
+**/.DS_Store
+**/Thumbs.db

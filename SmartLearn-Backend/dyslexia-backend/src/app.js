@@ -66,6 +66,16 @@ export const createApp = () => {
     });
   });
 
+  // Older frontend configurations point directly at http://localhost:5001
+  // and therefore omit the canonical /api/dyslexia prefix. Normalize those
+  // requests before routing so both URL formats reach the same handlers.
+  app.use((req, res, next) => {
+    if (/^\/(assessment|dashboard)(\/|$)/.test(req.url)) {
+      req.url = `/api/dyslexia${req.url}`;
+    }
+    next();
+  });
+
   app.use('/api/dyslexia', rateLimit({
     windowMs: 60 * 1000,
     limit: 120,

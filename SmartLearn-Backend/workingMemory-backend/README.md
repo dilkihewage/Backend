@@ -24,6 +24,13 @@ Backend service for the Smart Learn working-memory module.
 3. Install dependencies
 4. Start the server
 
+Shape prediction also requires a Python environment containing `ultralytics`.
+If that interpreter is not the default `python` on PATH, set its absolute path:
+
+```ini
+WORKING_MEMORY_PYTHON=C:\path\to\python.exe
+```
+
 ## Scripts
 
 - `npm run dev`

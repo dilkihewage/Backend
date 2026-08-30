@@ -92,6 +92,13 @@ Predictor-related:
 
 - `PREDICTOR_PROVIDER=python|mock`
 - `PREDICTOR_URL` when `PREDICTOR_PROVIDER=python`
+- `PREDICTOR_HEALTH_URL` optionally overrides the Python readiness endpoint
+- `PREDICTOR_HEALTH_TIMEOUT_MS` controls the readiness-check timeout
+- `MODEL_STARTUP_TIMEOUT_MS` controls how long Node waits for the model to load
+- `MODEL_STARTUP_POLL_INTERVAL_MS` controls how frequently readiness is checked
+- `MODEL_IMAGE_SIZE` controls YOLO input resolution (`416` is the speed-focused default)
+- `MODEL_DEVICE` selects inference hardware (`cpu`, `cuda`, and so on)
+- `MODEL_MAX_DETECTIONS` limits post-processing work for each handwriting image
 - `ML_CONFIDENCE_THRESHOLD`
 - `MAX_IMAGE_SIZE_MB`
 - `ALLOW_MOCK_TARGET_ECHO`
@@ -158,6 +165,11 @@ Current totals:
 
 The backend exposes a predictor abstraction in `src/modules/dysgraphia/predictor.js`.
 
+When the Python provider is enabled, the Node process starts the model server and
+waits for its `/health` endpoint before opening the public API port. Startup fails
+cleanly if the model process exits or does not become ready before the configured
+timeout. The Python process is skipped when the mock provider is selected.
+
 Interface:
 
 - `predictSingleCharacter(imageBuffer)`
@@ -186,14 +198,26 @@ For words:
 
 ### `GET /health`
 
-Returns service health.
+Returns API and predictor readiness. When the Python provider is enabled, the
+backend calls the predictor health endpoint and returns `503` until it is ready.
+The predictor URL defaults to `PREDICTOR_URL` with `/predict` replaced by
+`/health`.
 
 Example response:
 
 ```json
 {
   "status": "ok",
-  "service": "dysgraphia-backend"
+  "service": "dysgraphia-backend",
+  "environment": "production",
+  "checks": {
+    "api": { "status": "ready" },
+    "predictor": {
+      "status": "ready",
+      "provider": "python",
+      "detail": "Python predictor is ready."
+    }
+  }
 }
 ```
 
@@ -321,7 +345,10 @@ Resets the authenticated user’s dysgraphia data.
 Allowed when:
 
 - the user role is `admin`, or
-- `ENABLE_DEV_RESET=true`
+- `ENABLE_DEV_RESET=true` in a non-production environment
+
+`ENABLE_DEV_RESET` defaults to `false` and is always disabled when
+`NODE_ENV=production`.
 
 ## Error Format
 

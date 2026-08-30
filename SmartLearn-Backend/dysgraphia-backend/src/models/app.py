@@ -1,8 +1,11 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from ultralytics import YOLO
 from pathlib import Path
-import shutil
-import uuid
+import cv2
+import numpy as np
+import os
+import threading
+import time
 
 app = FastAPI()
 
@@ -15,8 +18,9 @@ BASE_DIR = Path(__file__).resolve().parent
 
 MODEL_PATH = BASE_DIR / "best.pt"
 
-TEMP_DIR = BASE_DIR / "temp"
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+MODEL_IMAGE_SIZE = int(os.getenv("MODEL_IMAGE_SIZE", "416"))
+MODEL_DEVICE = os.getenv("MODEL_DEVICE", "cpu")
+MODEL_MAX_DETECTIONS = int(os.getenv("MODEL_MAX_DETECTIONS", "10"))
 
 
 # ============================================
@@ -52,6 +56,22 @@ print("Starting Sinhala handwriting model...")
 print(f"Model path: {MODEL_PATH}")
 
 model = YOLO(str(MODEL_PATH))
+inference_lock = threading.Lock()
+
+# Perform model setup and tensor allocation during startup instead of making
+# the first student request pay the cold-inference cost.
+warmup_image = np.full(
+    (MODEL_IMAGE_SIZE, MODEL_IMAGE_SIZE, 3),
+    255,
+    dtype=np.uint8,
+)
+model.predict(
+    warmup_image,
+    imgsz=MODEL_IMAGE_SIZE,
+    device=MODEL_DEVICE,
+    max_det=MODEL_MAX_DETECTIONS,
+    verbose=False,
+)
 
 print("Sinhala handwriting model loaded successfully.")
 print("Model classes:", model.names)
@@ -75,87 +95,94 @@ async def health():
 # ============================================
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
+def predict(file: UploadFile = File(...)):
+    request_started = time.perf_counter()
+    contents = file.file.read()
+    encoded_image = np.frombuffer(contents, dtype=np.uint8)
+    image = cv2.imdecode(encoded_image, cv2.IMREAD_COLOR)
 
-    file_path = TEMP_DIR / f"{uuid.uuid4()}.jpg"
+    if image is None:
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image.")
 
-    try:
+    decode_finished = time.perf_counter()
 
-        # Save uploaded image
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # YOLO prediction
-        results = model(str(file_path))
-
-        candidates = []
-
-        for result in results:
-
-            if result.boxes is None:
-                continue
-
-            for box in result.boxes:
-
-                class_id = int(box.cls[0])
-                confidence = float(box.conf[0])
-
-                class_name = model.names[class_id]
-
-                sinhala_letter = LABEL_MAP.get(
-                    class_name,
-                    class_name
-                )
-
-                candidates.append({
-                    "label": class_name,
-                    "sinhala": sinhala_letter,
-                    "confidence": confidence
-                })
-
-        # Highest confidence first
-        candidates.sort(
-            key=lambda x: x["confidence"],
-            reverse=True
+    # The synchronous endpoint runs outside FastAPI's event loop, keeping the
+    # health endpoint responsive while CPU inference is running. The lock keeps
+    # the shared YOLO model safe from overlapping inference calls.
+    with inference_lock:
+        results = model.predict(
+            image,
+            imgsz=MODEL_IMAGE_SIZE,
+            device=MODEL_DEVICE,
+            max_det=MODEL_MAX_DETECTIONS,
+            verbose=False,
         )
 
-        # Nothing detected
-        if not candidates:
+    inference_finished = time.perf_counter()
 
-            return {
-                "success": False,
-                "label": "",
-                "sinhala": "",
-                "confidence": 0,
-                "candidates": []
-            }
+    candidates = []
 
-        best = candidates[0]
+    for result in results:
 
-        print(
-            f"Prediction: {best['label']} "
-            f"-> {best['sinhala']} "
-            f"({best['confidence']:.4f})"
-        )
+        if result.boxes is None:
+            continue
 
+        for box in result.boxes:
+
+            class_id = int(box.cls[0])
+            confidence = float(box.conf[0])
+
+            class_name = model.names[class_id]
+
+            sinhala_letter = LABEL_MAP.get(
+                class_name,
+                class_name
+            )
+
+            candidates.append({
+                "label": class_name,
+                "sinhala": sinhala_letter,
+                "confidence": confidence
+            })
+
+    candidates.sort(
+        key=lambda x: x["confidence"],
+        reverse=True
+    )
+
+    timing = {
+        "decodeMs": round((decode_finished - request_started) * 1000, 2),
+        "inferenceMs": round((inference_finished - decode_finished) * 1000, 2),
+        "totalMs": round((time.perf_counter() - request_started) * 1000, 2),
+        "imageSize": MODEL_IMAGE_SIZE,
+        "device": MODEL_DEVICE,
+    }
+
+    if not candidates:
         return {
-            "success": True,
-
-            # Original YOLO class
-            "label": best["label"],
-
-            # Sinhala character
-            "sinhala": best["sinhala"],
-
-            # Confidence
-            "confidence": best["confidence"],
-
-            # All candidates
-            "candidates": candidates
+            "success": False,
+            "label": "",
+            "sinhala": "",
+            "confidence": 0,
+            "candidates": [],
+            "timing": timing,
         }
 
-    finally:
+    best = candidates[0]
 
-        # Remove temporary image
-        if file_path.exists():
-            file_path.unlink()
+    return {
+        "success": True,
+
+        # Original YOLO class
+        "label": best["label"],
+
+        # Sinhala character
+        "sinhala": best["sinhala"],
+
+        # Confidence
+        "confidence": best["confidence"],
+
+        # All candidates
+        "candidates": candidates,
+        "timing": timing,
+    }

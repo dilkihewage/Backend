@@ -11,8 +11,9 @@ const { createPredictor } = require("./modules/dysgraphia/predictor");
 const { createFirestoreDysgraphiaRepository } = require("./modules/dysgraphia/repository");
 const { createDysgraphiaRoutes, createUploadMiddleware, assertFilePresent } = require("./modules/dysgraphia/routes");
 const { createDysgraphiaService } = require("./modules/dysgraphia/service");
+const { createModelHealthChecker } = require("./services/modelHealthService");
 
-function createLogger(loggerInstance) {
+function createLogger(loggerInstance, destination) {
   if (loggerInstance) {
     return loggerInstance;
   }
@@ -20,11 +21,19 @@ function createLogger(loggerInstance) {
   return pino({
     level: env.logLevel,
     base: undefined,
-  });
+    redact: {
+      paths: [
+        "req.headers.authorization",
+        "headers.authorization",
+        "request.headers.authorization",
+      ],
+      censor: "[REDACTED]",
+    },
+  }, destination);
 }
 
 function createApp(overrides = {}) {
-  const logger = createLogger(overrides.logger);
+  const logger = createLogger(overrides.logger, overrides.logDestination);
   const firebaseAdmin = overrides.firebaseAdmin || getFirebaseAdminServices();
   const repository =
     overrides.repository ||
@@ -49,6 +58,8 @@ function createApp(overrides = {}) {
       logger,
     });
   const controller = overrides.controller || createDysgraphiaController({ service });
+  const modelHealthChecker =
+    overrides.modelHealthChecker || createModelHealthChecker({ logger });
   const app = express();
 
   app.disable("x-powered-by");
@@ -92,11 +103,18 @@ function createApp(overrides = {}) {
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
   // ==================== HEALTH CHECK ====================
-  app.get("/health", (req, res) => {
-    res.status(200).json({
-      status: "ok",
+  app.get("/health", async (req, res) => {
+    const predictor = await modelHealthChecker.check();
+    const ready = predictor.status === "ready";
+
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ok" : "unavailable",
       service: "dysgraphia-backend",
       environment: env.nodeEnv,
+      checks: {
+        api: { status: "ready" },
+        predictor,
+      },
     });
   });
 
