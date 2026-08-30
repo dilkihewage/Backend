@@ -23,6 +23,14 @@ const __dirname = path.dirname(__filename);
 const mlFolder = path.resolve(__dirname, '../../ml');
 const predictScript = path.join(mlFolder, 'predict.py');
 
+const resolvePythonExecutable = () => {
+  if (process.env.WORKING_MEMORY_PYTHON) {
+    return process.env.WORKING_MEMORY_PYTHON;
+  }
+
+  return 'python';
+};
+
 const resolveUserId = (req) => {
   const bodyUserId = req.body && typeof req.body === 'object' ? req.body.userId : undefined;
   const userId = bodyUserId || req.query.userId || req.headers['x-user-id'];
@@ -118,7 +126,8 @@ export const predictShape = async (req, res) => {
 
   try {
     const result = await new Promise((resolve, reject) => {
-      const python = spawn('python', [
+      const pythonExecutable = resolvePythonExecutable();
+      const python = spawn(pythonExecutable, [
         predictScript,
         imagePath,
       ]);
@@ -134,6 +143,14 @@ export const predictShape = async (req, res) => {
         errorOutput += data.toString();
       });
 
+      python.on('error', (error) => {
+        reject(
+          new Error(
+            `Could not start YOLO Python executable "${pythonExecutable}": ${error.message}`
+          )
+        );
+      });
+
       python.on('close', (code) => {
         if (code !== 0) {
           reject(
@@ -144,13 +161,22 @@ export const predictShape = async (req, res) => {
           return;
         }
 
-        try {
-          resolve(JSON.parse(output));
-        } catch (error) {
-          reject(
-            new Error('Invalid YOLO prediction response')
-          );
+        const outputLines = output
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .reverse();
+
+        for (const line of outputLines) {
+          try {
+            resolve(JSON.parse(line));
+            return;
+          } catch {
+            // Ultralytics can print configuration notices before the JSON.
+          }
         }
+
+        reject(new Error('Invalid YOLO prediction response'));
       });
     });
 

@@ -1,4 +1,5 @@
 /venv/
+/.venv-dyscalculia/
 
 # Node dependencies
 **/node_modules/

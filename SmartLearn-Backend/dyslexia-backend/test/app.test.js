@@ -85,6 +85,16 @@ test('assessment GET route is registered', async () => {
   assert.notEqual(response.statusCode, 404);
 });
 
+test('legacy direct assessment route is registered', async () => {
+  const response = await request(app).get('/assessment/any-user-id');
+  assert.notEqual(response.statusCode, 404);
+});
+
+test('legacy direct dashboard route is registered', async () => {
+  const response = await request(app).get('/dashboard/any-user-id');
+  assert.notEqual(response.statusCode, 404);
+});
+
 test('assessment DELETE route is registered', async () => {
   const response = await request(app).delete('/api/dyslexia/assessment/any-user-id');
   assert.notEqual(response.statusCode, 404);
