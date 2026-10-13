@@ -23,12 +23,17 @@ const __dirname = path.dirname(__filename);
 const mlFolder = path.resolve(__dirname, '../../ml');
 const predictScript = path.join(mlFolder, 'predict.py');
 
-const resolvePythonExecutable = () => {
+const resolvePythonCommand = () => {
   if (process.env.WORKING_MEMORY_PYTHON) {
-    return process.env.WORKING_MEMORY_PYTHON;
+    return {
+      executable: process.env.WORKING_MEMORY_PYTHON,
+      args: [],
+    };
   }
 
-  return 'python';
+  return process.platform === 'win32'
+    ? { executable: 'py', args: ['-3.11'] }
+    : { executable: 'python3', args: [] };
 };
 
 const resolveUserId = (req) => {
@@ -126,8 +131,9 @@ export const predictShape = async (req, res) => {
 
   try {
     const result = await new Promise((resolve, reject) => {
-      const pythonExecutable = resolvePythonExecutable();
+      const { executable: pythonExecutable, args: pythonArgs } = resolvePythonCommand();
       const python = spawn(pythonExecutable, [
+        ...pythonArgs,
         predictScript,
         imagePath,
       ]);

@@ -1,12 +1,13 @@
 import os
 import sys
 import json
+import tempfile
 
-# Keep Ultralytics settings in a writable project-local folder. On restricted
-# Windows accounts its default AppData settings path can be read-only.
+# Keep Ultralytics settings outside OneDrive and AppData. Both locations can
+# be protected by Windows Controlled Folder Access on school devices.
 os.environ.setdefault(
     "YOLO_CONFIG_DIR",
-    os.path.dirname(os.path.abspath(__file__))
+    os.path.join(tempfile.gettempdir(), "smartlearn-ultralytics")
 )
 
 from ultralytics import YOLO

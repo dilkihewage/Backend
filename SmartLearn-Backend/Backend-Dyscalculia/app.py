@@ -1,6 +1,7 @@
 import base64
 import io
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -38,6 +39,7 @@ CORS(
 )
 
 model = None
+prediction_lock = threading.Lock()
 
 
 def build_digit_model():
@@ -77,12 +79,18 @@ def load_digit_model() -> None:
     # compile=False avoids unnecessary metric warnings for prediction-only use.
     try:
         model = load_model(str(MODEL_PATH), compile=False)
-    except TypeError as exc:
+    except (TypeError, ValueError) as exc:
         # Some HDF5 models saved by newer Keras releases contain initializer
         # metadata that older releases cannot deserialize. The layer layout is
         # stable and maintained in training/train_model.py, so rebuild it and
         # restore the weights without deserializing that metadata.
-        if "input_axes" not in str(exc) and "output_axes" not in str(exc):
+        error_message = str(exc)
+        incompatible_initializer_metadata = (
+            "input_axes" in error_message
+            or "output_axes" in error_message
+        )
+
+        if not incompatible_initializer_metadata:
             raise
 
         model = build_digit_model()
@@ -262,7 +270,20 @@ def predict_array(image_array: np.ndarray) -> tuple[int, float, list]:
     if model is None:
         raise RuntimeError("Prediction model has not been loaded.")
 
-    predictions = model.predict(image_array, verbose=0)
+    # Keras/HDF5 models are not reliably re-entrant on every supported
+    # TensorFlow version. Serializing inference prevents intermittent 500s
+    # when the browser submits close-together evaluation requests.
+    with prediction_lock:
+        predictions = model.predict(image_array, verbose=0)
+
+    if predictions.ndim != 2 or predictions.shape != (1, 10):
+        raise RuntimeError(
+            "Prediction model returned an unexpected output shape: "
+            f"{predictions.shape}."
+        )
+
+    if not np.isfinite(predictions).all():
+        raise RuntimeError("Prediction model returned invalid values.")
 
     probabilities = predictions[0]
     predicted_digit = int(np.argmax(probabilities))
