@@ -5,7 +5,9 @@
   "type": "module",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node scripts/start-all.js",
+    "start:api": "node src/server.js",
+    "start:model": "python3.11 app.py",
     "dev": "nodemon src/server.js",
     "test": "node --test",
     "check": "node --check src/server.js"

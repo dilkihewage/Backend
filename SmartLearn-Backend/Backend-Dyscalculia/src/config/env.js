@@ -18,7 +18,13 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDbName: process.env.MONGODB_DB_NAME || '',
+  requireMongodb: process.env.REQUIRE_MONGODB === 'true',
+  dnsServers: (process.env.DNS_SERVERS || '')
+    .split(',')
+    .map((server) => server.trim())
+    .filter(Boolean),
   clientOrigins: parseOrigins(process.env.CLIENT_ORIGIN),
+  mlServiceUrl: process.env.ML_SERVICE_URL || `http://127.0.0.1:${process.env.ML_PORT || 4002}`,
 };
 
 export const isProduction = env.nodeEnv === 'production';
