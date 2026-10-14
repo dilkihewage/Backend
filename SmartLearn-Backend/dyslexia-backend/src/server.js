@@ -3,7 +3,7 @@ import { env } from './config/env.js';
 import { connectDatabase } from './config/database.js';
 
 const startServer = async () => {
-  const connection = await connectDatabase();
+  const connection = env.mongodbUri ? await connectDatabase() : null;
 
   if (connection) {
     console.log('MongoDB connected ✅');
@@ -16,7 +16,9 @@ const startServer = async () => {
   });
 };
 
-startServer().catch((error) => {
-  console.error('Failed to start server:', error.message);
+if (!process.env.VERCEL) startServer().catch((error) => {
+  console.error('Failed to start server:', { type: error.name });
   process.exit(1);
 });
+
+export default app;

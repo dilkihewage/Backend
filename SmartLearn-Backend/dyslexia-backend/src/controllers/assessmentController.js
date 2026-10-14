@@ -1,3 +1,4 @@
+import { connectDatabase } from '../config/database.js';
 import { PreAssessment } from '../models/PreAssessment.js';
 import { UserProgress } from '../models/UserProgress.js';
 import { HttpError } from '../utils/httpError.js';
@@ -51,7 +52,7 @@ const deriveLegacyScores = (assessment = {}) => {
   };
 };
 
-const normalizeAssessment = (assessment = {}, userId) => {
+const normalizeAssessment = (assessment, userId) => {
   if (!assessment || typeof assessment !== 'object') return null;
 
   const sections = assessment.sections ?? {};
@@ -112,6 +113,8 @@ export const saveAssessment = asyncHandler(async (req, res) => {
   const unlockedSections = assessmentInput ? ALL_SECTION_IDS : computeUnlockedSections(legacyScores);
 
   // Upsert — retakes overwrite previous result, incrementing attemptCount
+  await connectDatabase();
+
   const existing = await PreAssessment.findOne({ userId });
   const attemptCount = existing ? existing.attemptCount + 1 : 1;
 
@@ -170,6 +173,8 @@ export const saveAssessment = asyncHandler(async (req, res) => {
  */
 export const getAssessment = asyncHandler(async (req, res) => {
   const userId = resolveUserId(req);
+  await connectDatabase();
+
   const assessment = await PreAssessment.findOne({ userId }).lean();
 
   if (!assessment) {
@@ -201,6 +206,8 @@ export const getAssessment = asyncHandler(async (req, res) => {
 export const resetAssessment = asyncHandler(async (req, res) => {
   const userId = resolveUserId(req);
 
+  await connectDatabase();
+
   await PreAssessment.deleteOne({ userId });
 
   // Reset assessment fields in UserProgress but keep game progress
@@ -224,6 +231,8 @@ export const resetAssessment = asyncHandler(async (req, res) => {
  */
 export const getUnlockedSections = asyncHandler(async (req, res) => {
   const userId = resolveUserId(req);
+  await connectDatabase();
+
   const assessment = await PreAssessment.findOne({ userId }, 'unlockedSections').lean();
 
   // Default — always-unlocked sections returned even before assessment

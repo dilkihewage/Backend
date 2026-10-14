@@ -1,3 +1,4 @@
+import { connectDatabase } from '../config/database.js';
 import { PreAssessment } from '../models/PreAssessment.js';
 import { UserProgress } from '../models/UserProgress.js';
 import { DyslexiaSession } from '../models/DyslexiaSession.js';
@@ -12,6 +13,9 @@ const resolveUserId = (req) => {
   const userId = req.params?.userId || req.query?.userId || req.headers['x-user-id'];
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     throw new HttpError(400, 'userId is required');
+  }
+  if (userId.trim() === ':userId' || /[\x00-\x1f\x7f]/.test(userId)) {
+    throw new HttpError(400, 'Invalid userId');
   }
   return userId.trim();
 };
@@ -164,6 +168,8 @@ export const getUserDashboard = asyncHandler(async (req, res) => {
   const userId = resolveUserId(req);
 
   // Parallel fetch of all needed data
+  await connectDatabase();
+
   const [assessment, progress, sessions] = await Promise.all([
     PreAssessment.findOne({ userId }).lean(),
     UserProgress.findOne({ userId, moduleId: 'dyslexia' }).lean(),
@@ -255,6 +261,8 @@ export const getUserDashboard = asyncHandler(async (req, res) => {
  * Only returns users who have at least one session.
  */
 export const getAllUsersDashboard = asyncHandler(async (req, res) => {
+  await connectDatabase();
+
   const [allProgress, allAssessments] = await Promise.all([
     UserProgress.find({ moduleId: 'dyslexia' })
       .select('userId totalSessions completedSessions bestScore averageScore lastPlayedAt unlockedSections assessmentDone recommendedLevel weakLetters')

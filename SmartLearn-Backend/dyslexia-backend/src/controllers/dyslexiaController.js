@@ -1,3 +1,4 @@
+import { connectDatabase } from '../config/database.js';
 import mongoose from 'mongoose';
 
 import { dyslexiaOverview } from '../config/overviewData.js';
@@ -190,6 +191,8 @@ export const startSession = asyncHandler(async (req, res) => {
     throw new HttpError(400, 'A valid gameKey is required');
   }
 
+  await connectDatabase();
+
   const session = await DyslexiaSession.create({
     userId,
     moduleId: 'dyslexia',
@@ -220,6 +223,8 @@ export const listSessions = asyncHandler(async (req, res) => {
     filter.status = status;
   }
 
+  await connectDatabase();
+
   const sessions = await DyslexiaSession.find(filter)
     .sort({ startedAt: -1 })
     .limit(limit)
@@ -237,6 +242,8 @@ export const getSessionById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(sessionId)) {
     throw new HttpError(400, 'Invalid sessionId');
   }
+
+  await connectDatabase();
 
   const session = await DyslexiaSession.findById(sessionId);
 
@@ -262,6 +269,8 @@ export const recordAttempt = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(sessionId)) {
     throw new HttpError(400, 'Invalid sessionId');
   }
+
+  await connectDatabase();
 
   const session = await DyslexiaSession.findById(sessionId);
 
@@ -328,6 +337,8 @@ export const completeSession = asyncHandler(async (req, res) => {
     throw new HttpError(400, 'Invalid sessionId');
   }
 
+  await connectDatabase();
+
   const session = await DyslexiaSession.findById(sessionId);
 
   if (!session) {
@@ -385,6 +396,8 @@ export const completeSession = asyncHandler(async (req, res) => {
 
 export const getProgress = asyncHandler(async (req, res) => {
   const userId = req.params.userId || resolveUserId(req);
+
+  await connectDatabase();
 
   const progress = await UserProgress.findOne({ userId, moduleId: 'dyslexia' }).lean();
   const recentSessions = await DyslexiaSession.find({ userId, moduleId: 'dyslexia' })

@@ -1,43 +1,30 @@
 import mongoose from 'mongoose';
-
 import { env } from './env.js';
+import { HttpError } from '../utils/httpError.js';
 
-const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+let connectionPromise;
+mongoose.set('strictQuery', true);
 
-export const connectDatabase = async ({ maxAttempts = 6 } = {}) => {
-  if (!env.mongodbUri) {
-    return null;
+export const connectDatabase = async () => {
+  if (mongoose.connection.readyState === 1) return mongoose.connection;
+  if (!env.mongodbUri) throw new HttpError(503, 'Database unavailable');
+  if (!connectionPromise) {
+    connectionPromise = Promise.resolve().then(() => mongoose.connect(env.mongodbUri, {
+      ...(env.mongodbDbName ? { dbName: env.mongodbDbName } : {}),
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
+      maxPoolSize: 5,
+    })).then(() => mongoose.connection).catch((error) => {
+      // Connection messages may contain credentials. Log only the error class.
+      console.error('MongoDB connection failed', { type: error.name });
+      throw new HttpError(503, 'Database unavailable');
+    }).finally(() => { connectionPromise = undefined; });
   }
-
-  mongoose.set('strictQuery', true);
-
-  const options = {};
-
-  if (env.mongodbDbName) {
-    options.dbName = env.mongodbDbName;
-  }
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await mongoose.connect(env.mongodbUri, {
-        ...options,
-        serverSelectionTimeoutMS: 10000,
-      });
-      return mongoose.connection;
-    } catch (error) {
-      if (attempt === maxAttempts) throw error;
-
-      const delayMs = Math.min(1000 * (2 ** (attempt - 1)), 10000);
-      console.warn(
-        `MongoDB connection attempt ${attempt}/${maxAttempts} failed (${error.code || error.message}). Retrying in ${delayMs / 1000}s...`
-      );
-      await wait(delayMs);
-    }
-  }
-
-  return null;
+  return connectionPromise;
 };
 
 export const disconnectDatabase = async () => {
+  if (connectionPromise) await connectionPromise.catch(() => {});
   await mongoose.disconnect();
 };

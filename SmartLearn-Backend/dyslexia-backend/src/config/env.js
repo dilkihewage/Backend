@@ -18,7 +18,7 @@ export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   mongodbUri: process.env.MONGODB_URI || '',
   mongodbDbName: process.env.MONGODB_DB_NAME || '',
-  clientOrigins: parseOrigins(process.env.CLIENT_ORIGIN),
+  clientOrigins: [...new Set(['https://r26-it-114-jflg.vercel.app', ...parseOrigins(process.env.CLIENT_ORIGIN)])],
 };
 
 export const isProduction = env.nodeEnv === 'production';
