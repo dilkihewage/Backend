@@ -19,6 +19,10 @@
 **/.env
 **/.env.local
 
+# Local backend archives may contain secrets and dependencies
+/SmartLearn-Backend.zip
+/SmartLearn-Backend/workingMemory-backend.zip
+
 # Generated runtime and ML output
 **/uploads/
 **/runs/
